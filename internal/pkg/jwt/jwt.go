@@ -1,0 +1,172 @@
+package jwt
+
+import (
+	"errors"
+	"github.com/gin-gonic/gin"
+	"time"
+	"wenba/internal/dao/mysql/sqlx"
+	"wenba/internal/global"
+	"wenba/internal/pkg/app/errcode"
+
+	"github.com/dgrijalva/jwt-go"
+)
+
+// MyClaims 自定义声明结构体并内嵌jwt.StandardClaims
+// jwt包自带的jwt.StandardClaims只包含了官方字段
+// 我们这里需要额外记录一个UserID字段，所以要自定义结构体
+// 如果想要保存更多信息，都可以添加到这个结构体中
+type MyClaims struct {
+	UserID    uint64         `json:"user_id"`
+	Username  string         `json:"username"`
+	Privilege sqlx.Privilege `json:"privilege"`
+	jwt.StandardClaims
+}
+
+//定义Secret
+var mySecret = []byte("夏天夏天悄悄过去")
+
+func keyFunc(_ *jwt.Token) (i interface{}, err error) {
+	return mySecret, nil
+}
+
+//TokenExpireDuration 定义JWT的过期时间
+const TokenExpireDuration = time.Hour * 2
+
+func GenToken(userID uint64, username string) (aToken, rToken string, err error) {
+	//先根据用户名查询用户的相关信息
+	user, err := sqlx.GetUserByUsername(username)
+	if err != nil {
+		return "", "", err
+	}
+	userID = uint64(user.ID)
+	username = user.UserName
+	privilege := user.Privilege
+	// 创建一个我们自己的声明
+	c := MyClaims{
+		UserID:    userID,   // 自定义字段
+		Username:  username, // 自定义字段
+		Privilege: privilege,
+		StandardClaims: jwt.StandardClaims{ // JWT规定的7个官方字段
+			ExpiresAt: time.Now().Add(
+				time.Duration(global.Settings.Token.ExpireTime) * time.Hour).Unix(), // 过期时间
+			Issuer: "wenba", // 签发人
+		},
+	}
+	// 加密并获得完整的编码后的字符串token
+	aToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(mySecret)
+
+	// refresh token 不需要存任何自定义数据
+	rToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		ExpiresAt: time.Now().Add(time.Second * 30).Unix(), // 过期时间
+		Issuer:    "wenba",                                 // 签发人
+	}).SignedString(mySecret)
+	// 使用指定的secret签名并获得完整的编码后的字符串token
+	return
+}
+
+//GenToken 生成 Token
+/*
+func GenToken2(userID uint64, username string) (Token string, err error) {
+	// 创建一个我们自己的声明
+	c := MyClaims{
+		userID,     // 自定义字段
+		"username", // 自定义字段
+		jwt.StandardClaims{ // JWT规定的7个官方字段
+			ExpiresAt: time.Now().Add(TokenExpireDuration).Unix(), // 过期时间
+			Issuer:    "wenba",                                    // 签发人
+		},
+	}
+	// 加密并获得完整的编码后的字符串token
+	Token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(mySecret)
+
+
+	// refresh token 不需要存任何自定义数据
+	//rToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+	//	ExpiresAt: time.Now().Add(time.Second * 30).Unix(), // 过期时间
+	//	Issuer:    "bluebell",                              // 签发人
+	//}).SignedString(mySecret)	// 使用指定的secret签名并获得完整的编码后的字符串token
+	return
+}
+*/
+
+func ParseToken(tokenString string) (claims *MyClaims, err error) {
+	// 解析token
+	var token *jwt.Token
+	claims = new(MyClaims)
+	token, err = jwt.ParseWithClaims(tokenString, claims, keyFunc)
+	if err != nil {
+		return
+	}
+	if !token.Valid { // 校验token
+		err = errors.New("invalid token")
+	}
+	return
+}
+
+// RefreshToken 刷新AccessToken
+func RefreshToken(aToken, rToken string) (newAToken, newRToken string, err error) {
+	// refresh token无效直接返回
+	if _, err = jwt.Parse(rToken, keyFunc); err != nil {
+		return
+	}
+
+	// 从旧access token中解析出claims数据	解析出payload负载信息
+	var claims MyClaims
+	_, err = jwt.ParseWithClaims(aToken, &claims, keyFunc)
+	v, _ := err.(*jwt.ValidationError)
+
+	// 当access token是过期错误 并且 refresh token没有过期时就创建一个新的access token
+	if v.Errors == jwt.ValidationErrorExpired {
+		return GenToken(claims.UserID, claims.Username)
+	}
+	return
+}
+
+type EmailClaims struct {
+	ID            int64  `json:"id"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	OperationType int64  `json:"operation_type"`
+	jwt.StandardClaims
+}
+
+//GenEmailToken 生成EmailToken
+func GenEmailToken(userID, operation int64, email, password string) (Token string, err error) {
+	// 创建一个我们自己的声明
+	c := EmailClaims{
+		ID:            userID,
+		Email:         email,
+		Password:      password,
+		OperationType: operation,
+		StandardClaims: jwt.StandardClaims{ // JWT规定的7个官方字段
+			ExpiresAt: time.Now().Add(TokenExpireDuration).Unix(), // 过期时间
+			Issuer:    "wenba",                                    // 签发人
+		},
+	}
+	// 加密并获得完整的编码后的字符串token
+	Token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(mySecret)
+	return
+}
+
+//ParseEmailToken 解析EmailToken
+func ParseEmailToken(tokenString string) (claims *EmailClaims, err error) {
+	// 解析token
+	var token *jwt.Token
+	claims = new(EmailClaims)
+	token, err = jwt.ParseWithClaims(tokenString, claims, keyFunc)
+	if err != nil {
+		return
+	}
+	if !token.Valid { // 校验token
+		err = errors.New("invalid token")
+	}
+	return
+}
+
+func GetEmailPayload(ctx *gin.Context) (*EmailClaims, error) {
+	email, ok := ctx.Get(global.Settings.Token.AuthorizationKey)
+	if !ok {
+		return nil, errcode.ErrUnauthorizedAuthNotExist
+	}
+	return email.(*EmailClaims), nil
+}

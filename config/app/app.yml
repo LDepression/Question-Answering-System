@@ -1,0 +1,58 @@
+App:
+  Name: wenba
+  StartTime: 2022-10-27
+  Version: v1
+Log:
+  Level: debug
+  LogSavePath: "storage/Applogs/" # 日志保存路径
+  HighLevelFile: error          # 高级别日志文件名
+  LowLevelFile: info          # 低级别文件名
+  LogFileExt: .log          # 日志文件后缀
+  MaxSize: 10 # 日志文件最大大小
+  MaxAge: 30 # 日志文件最大保存天数
+  MaxBackups: 7 # 最大备份数
+  Compress: false # 是否压缩
+MySQL:
+  Host: "127.0.0.1"
+  User: "root"
+  Password: "zxz123456"
+  DbName: "wenba"
+  Port: "3306"
+  MaxOpenConns: 10
+  MaxIdleConns: 10
+Page:
+   DefaultPageSize: 10
+   MaxPageSize: 20
+   PageKey: page
+   PageSizeKey: page_size
+Server:
+  Addr: :8080
+  Mode: debug
+  ReadTimeout: 5s
+  WriteTimeout: 5s
+  DefaultContextTimeout: 30s #默认超时时间
+Email:
+  ValidEmail: http://localhost:8080/#/vaild/email/
+  SmtpHost: smtp.qq.com
+  SmtpEmail: 1197285120@qq.com #你的邮箱
+  SmtpPass: "zibwqaowvgongjca"
+Token:
+  Key: "12345678123456781234567812345678"
+  ExpireTime: 24
+  AssessTokenDuration: 15m
+  RefreshTokenDuration: 24h
+  AuthorizationKey: Authorization # 授权头密钥
+  AuthorizationType: bearer # 承载前缀
+Redis: # Redis配置
+  Address: "127.0.0.1:6379"
+  DB: 0
+  Password: 123456
+  PoolSize: 100 #连接池
+  CacheTime: 1h
+Rule:
+  MaxUsernameLen: 12
+  MinUsernameLen: 6
+  MaxPasswordLen: 12
+  MinPasswordLen: 6
+  Avatar: static/imgs/avatar/
+
