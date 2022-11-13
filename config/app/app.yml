@@ -35,7 +35,7 @@ Email:
   ValidEmail: http://localhost:8080/#/vaild/email/
   SmtpHost: smtp.qq.com
   SmtpEmail: 1197285120@qq.com #你的邮箱
-  SmtpPass: "zibwqaowvgongjca"
+  SmtpPass: "***"
 Token:
   Key: "12345678123456781234567812345678"
   ExpireTime: 24
